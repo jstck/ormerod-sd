@@ -1,8 +1,10 @@
 #!/bin/bash
 
-if [ ! -d "/Volumes/ORMEROD" ]; then
+SOURCE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/"
+TARGET="/Volumes/ORMEROD/"
+if [ ! -d "$TARGET" ]; then
   echo "SD card not found"
   exit 1
 fi
 
-rsync -av --modify-window=1 --delete --exclude '.*' /Users/stack/src/reprap/my-sd/ /Volumes/ORMEROD/
+rsync -av --modify-window=1 --delete --exclude '.*' "$SOURCE" "$TARGET"
