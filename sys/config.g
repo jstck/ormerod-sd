@@ -12,6 +12,6 @@ G21 ; Work in mm
 G90 ; Absolute positioning
 M83 ; Extrusions relative
 M558 P1 ; Turn Z Probe on
-G31 Z3.1 P600 ; Set Z probe height and threshold
+G31 Z2.7 P600 ; Set Z probe height and threshold
 M906 X800 Y1000 Z800 E800 ; Motor currents (mA)
 T0 ; Select extruder 0
