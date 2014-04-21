@@ -12,7 +12,7 @@ G21 ; Work in mm
 G90 ; Absolute positioning
 M83 ; Extrusions relative
 M558 P1 ; Turn Z Probe on
-G31 Z2.1 P600 ; Set Z probe height and threshold
+G31 Z2.2 P600 ; Set Z probe height and threshold
 M906 X800 Y1000 Z800 E800 ; Motor currents (mA)
 M203 X6000 Y6000 Z500 E3000 ; movement max speeds
 M208 X230 Y200 Z180 ; max travel - allow "X overshoot"
