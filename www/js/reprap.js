@@ -1,13 +1,11 @@
 /*! Reprap Ormerod Web Control | by Matt Burnett <matt@burny.co.uk>. | open license
  */
-var ver = 0.70; //App version
+var ver = 0.74; //App version
 var polling = false; 
 var webPrinting = false;
 var printing = false;
 var paused = false;
-var chart,chart2,ormerodIP,layerCount,currentLayer,objHeight,printStartTime,gFileLength,gFilename,buffer,timerStart,storage,layerHeight;
-var lastExaminedFile = "";
-var lastHeight;	// file that we last uploaded, and its total print height
+var chart,chart2,ormerodIP,layerCount,currentLayer,objHeight,objTotalFilament,startingFilamentPos,objUsedFilament,printStartTime,gFileLength,gFilename,buffer,currentFilamentPos,timerStart,storage,layerHeight,lastUpdatedTime;
 var maxUploadBuffer = 800;
 var maxUploadCommands = 20;
 var messageSeqId = 0;
@@ -37,7 +35,10 @@ jQuery.extend({
             case 'htm':
                 query = "?gcode="+encodeURIComponent(code);
                 reqType = "gcode";
-                break;                
+                break;
+			case 'fileinfo':
+				query = "?name="+encodeURIComponent(code);
+				break;
         }
         var url = '//' + ormerodIP + '/rr_'+reqType+query;
         $.ajax(url, {async:false,dataType:"json",success:function(data){result = data;}});
@@ -243,7 +244,7 @@ $('div#panicBtn button').on('click', function() {
             //switch off heaters
             $.askElle('gcode', "M140 S0"); //bed off
             $.askElle('gcode', "G10 P0 S0\nT0"); //head 0 off
-            resetLayerData("");
+            resetLayerData(0, 0);
         case "M24":
             //resume
             paused = false;
@@ -266,6 +267,7 @@ $('div#panicBtn button').on('click', function() {
 $("div#gFileList, div#gFileList2, div#gFileList3").on('click', 'button#gFileLink', function() {
     var danger = this.className.indexOf("btn-danger");
     if (danger < 0) {
+		clearSlic3rSettings();
 		printSDfile($(this).text());
     }
 }).on('mouseover', 'span#fileDelete', function() {
@@ -493,16 +495,19 @@ function handleFileDrop(data, fName, action) {
                 break;
             case "print":
                 gFilename = fName;
-				saveFileData("*");
+				getSlic3rSettings();
+				var h = findHeight();
                 message("info", "Web Printing " + fName + " started");
                 $('span#gFileDisplay').html('<strong>Direct from Web printing ' + fName + '</strong>');
                 webPrinting = true;
-                resetLayerData("*");
+                resetLayerData(h, 0);
                 $('#tabs a:eq(1)').tab('show'); //show print status after drop tab
                 uploadLoop(action, "");
                 break;
 			case "uploadandprint":
- 				var tempFilename = "tempWebPrint.gcode";
+                gFilename = fName;
+				getSlic3rSettings();
+				var tempFilename = "tempWebPrint.gcode";
 				uploadFile(fName, tempFilename, tempFilename);
 				break;
         }
@@ -513,17 +518,8 @@ function handleFileDrop(data, fName, action) {
     }
 }
 
-function saveFileData(toFile)
-{
-	var h = findHeight();
-	getSlic3rSettings();
-	lastExaminedFile = toFile;
-	lastHeight = h;
-}
-
 function uploadFile(fromFile, toFile, printAfterUpload)
 {
-	saveFileData(toFile);
 	$.askElle('gcode', "M28 " + toFile);
 	if (fromFile == toFile)
 	{
@@ -541,10 +537,20 @@ function uploadFile(fromFile, toFile, printAfterUpload)
 
 function printSDfile(fName)
 {
+	var info = $.askElle('fileinfo', fName);
+	var height = 0, filament = 0;
+	if (info.hasOwnProperty('height') && isNumber(info.height))
+	{
+		height = info.height;
+	}
+	if (info.hasOwnProperty('filament') && isNumber(info.filament))
+	{
+		filament = info.filament;
+	}
 	$.askElle('gcode', "M23 " + fName + "\nM24");
 	message('success', "File [" + fName + "] sent to print");
 	$('span#gFileDisplay').html('<strong>Printing ' + fName + ' from Duet SD card</strong>');
-	resetLayerData(fName);
+	resetLayerData(height, filament);
 	$('#tabs a:eq(1)').tab('show');
 }
 
@@ -566,7 +572,7 @@ function readFile(file, onLoadCallback){
 }
 
 function findHeight() {
-    //find last G1 Z command from end backwards and return height in mm
+    //find last G1 Z command not in a comment from end backwards and return height in mm
     var height=0;
     var start=0;    
     var end=0;
@@ -574,20 +580,27 @@ function findHeight() {
     while (height===0 && i > 1) {
         start = gFile[i].indexOf('G1 Z');
         if (start >= 0) {
-            end = gFile[i].indexOf(' ', start+4);
-            if(end > start) { 
-                height = gFile[i].substr(start+4, end-(start+4));
-            } else {
-                height = gFile[i].substr(start+4);
-            }
+			var comment = gFile[i].indexOf(';');
+			if (comment < 0 || comment > start) {
+				end = gFile[i].indexOf(' ', start+4);
+				if(end > start) { 
+					height = gFile[i].substr(start+4, end-(start+4));
+				} else {
+					height = gFile[i].substr(start+4);
+				}
+			}
         }
         i--;
     }
     return height;
 }
 
-function getSlic3rSettings() {
+function clearSlic3rSettings() {
     $('table#slic3r tbody').html(''); //slic3r setting <table>
+}
+
+function getSlic3rSettings() {
+	clearSlic3rSettings();
 //    switch (true) {
 //        case gFile[0].indexOf('Slic3r') >= 0:
 //            var values = {'Sliced With': 'generated by ', 'Layer Height': 'layer_height = ', 'Extrusion Multiplier' : 'extrusion_multiplier = ','Perimeters': 'perimeters = '};
@@ -669,7 +682,7 @@ function uploadLoop(action, fileToPrint) { //Web Printing/Uploading
             break;
         default:
             if (buffer == null || buffer < 100) {
-                resp = $.askElle('poll', '');
+                resp = $.askElle('status', '');
                 if (typeof resp != 'undefined') {
                     buffer = resp.buff;
                 } else {
@@ -878,6 +891,7 @@ function updatePage() {
             parseResponse(status.resp);
         }
         buffer = status.buff;
+		currentFilamentPos = status.extr[0];
         homedWarning(status.homed[0],status.homed[1],status.homed[2]);
 		if (status.status == "S") {
 			//stopped
@@ -890,14 +904,23 @@ function updatePage() {
             //printing
             printing = true;
             objHeight = $('input#objheight').val();
+			if (!isNumber(objHeight) && status.status == 'P' && status.hasOwnProperty('height')) {
+				objHeight = status.height;
+				$('input#objheight').val(objHeight.toString());
+			}
             $('button#printing').removeClass('btn-danger').removeClass('btn-warning').addClass('btn-success').text("Active");
             enableButtons('panic');
             disableButtons("head");
             disableButtons("gfilelist");
             currentLayer = whichLayer(status.pos[2]);
-            if (isNumber(objHeight)) {
-                if(!layerHeight) layerHeight = storage.get('settings','layerHeight');
+			if (isNumber(objHeight)) {
+                if (!layerHeight) layerHeight = storage.get('settings','layerHeight');
                 layerCount = Math.ceil(objHeight / layerHeight);
+			}
+			if (printStartTime && objTotalFilament > 0) {
+				setProgress(Math.floor((objUsedFilament / objTotalFilament) * 100), 'print', currentLayer, layerCount);
+				estEndTime();
+            } else if (printStartTime && layerCount > 0) {
                 setProgress(Math.floor((currentLayer / layerCount) * 100), 'print', currentLayer, layerCount);
             } else {
                 setProgress(0, 'print', 0, 0);
@@ -928,7 +951,7 @@ function updatePage() {
         $('span#Xpos').text(status.pos[0]);
         $('span#Ypos').text(status.pos[1]);
         $('span#Zpos').text(status.pos[2]);
-        $('span#Epos').text(status.pos[3]);
+        $('span#Epos').text(status.extr[0]);
         $('span#probe').text(status.probe);
 
         //Temp chart stuff
@@ -947,7 +970,7 @@ function estEndTime() {
     var d = new Date();
     var utime = d.getTime();
     var layerLeft = layerCount - currentLayer;
-    if (layerData.length > firstLayer) {
+    if (layerData.length > firstLayer && layerCount > 0) {
         var lastLayer = layerData[layerData.length - 1] - layerData[layerData.length - 2];
         var llTimeR = new Date(utime + (lastLayer * layerLeft));
         $('span#llTimeR').text((lastLayer * layerLeft).toHHMMSS()); 
@@ -974,7 +997,22 @@ function estEndTime() {
             $('span#avg5R').text((avg5 * layerLeft).toHHMMSS()); 
             $('span#avg5').text(avg5R.toLocaleTimeString()); 
         }
-    }
+	}	
+	if (objTotalFilament > 0)
+	{
+		if (currentFilamentPos - startingFilamentPos < objUsedFilament - 10) {
+			//probably just done a G30 E0 to reset the filament origin
+			startingFilamentPos = currentFilamentPos - objUsedFilament;
+		}
+		objUsedFilament = currentFilamentPos - startingFilamentPos;
+		if (objUsedFilament <= objTotalFilament && objUsedFilament > objTotalFilament * 0.05) {	//if at least 5% filament consumed
+			var timeSoFar = utime - printStartTime;
+			var timeLeft = timeSoFar * (objTotalFilament - objUsedFilament)/objUsedFilament;
+			var estEndTimeFil = new Date(utime + timeLeft);
+			$('span#filTimeR').text(timeLeft.toHHMMSS());
+			$('span#filTime').text(estEndTimeFil.toLocaleTimeString());
+		}
+	}
 }
 
 function whichLayer(currZ) {
@@ -986,12 +1024,17 @@ function whichLayer(currZ) {
     return n;
 }
 
-function resetLayerData(fName) {
+function resetLayerData(h, f) {
     //clear layer count,times and chart
-	if (fName == lastExaminedFile && isNumber(lastHeight))
-	{
-		$('input#objheight').val(lastHeight.toString());
+	if (h == 0) {
+		$('input#objheight').val("");
 	}
+	else {
+		$('input#objheight').val(h.toString());
+	}
+	objTotalFilament = f;
+	startingFilamentPos = currentFilamentPos;
+	objUsedFilament = 0;
     layerData = [];
     printStartTime = null;
     setProgress(0, 'print', 0, 0);
@@ -1020,7 +1063,7 @@ function layerChange() {
 function layers(layer) {
     var d = new Date();
     var utime = d.getTime();
-    if (layer === 1 && !printStartTime) {
+    if ((layer === 1 || layer == 2) && !printStartTime) {
         printStartTime = utime;
         layerData.push(utime);
     }
@@ -1041,8 +1084,13 @@ function setProgress(percent, bar, layer, layers) {
     var barText = $('span#'+bar+'ProgressText');
     var offText = $('span#'+bar+'OffBar');
     var ptext = percent + "% Complete";
-    if(bar == 'print') {
-        ptext += ", Layer " + layer + " of " + layers;
+    if (bar == 'print') {
+		if (layers > 0) {
+			ptext += ", Layer " + layer + " of " + layers;
+		}
+		if (objTotalFilament > 0) {
+			ptext += ", Filament " + (currentFilamentPos - startingFilamentPos) + " of " + objTotalFilament + "mm";
+		}
     }
     
     switch (true) {
@@ -1056,7 +1104,7 @@ function setProgress(percent, bar, layer, layers) {
             break;
         default:
             barText.text('').attr('title', '');
-            offText.text('0% complete, layer 0 of 0');
+            offText.text('0% complete');
             break;
     }
     $('div#'+bar+'Progress').css("width", percent + "%");
