@@ -9,9 +9,8 @@ G90
 G1 X-240 F2000 S1 ; Move as far left as possible, track endstop
 G92 X0
 G1 X5 F200 ; Back off a little bit
-G1 X-20 F200 S1 ; Go to endstop again a bit slower
+G1 X-10 F200 S1 ; Go to endstop again a bit slower
 G92 X0 ; Home!
-
 
 ;Y
 G90
@@ -24,7 +23,7 @@ G92 Y200 ; We're here!
 
 ;Z
 G90 ; set movements absolute
-G1 X228 Y175 F5000 ; Move to the X, Y point at which to probe the bed over the foil
+G1 X208 Y180 F5000 ; Move to the X, Y point at which to probe the bed over the foil
 G30 ; Move down until the probe is triggered (i.e. move down until the IR voltage is 656, which automatically sets Z = probe height).
 G1 Z5 F200 ; Move up to get out of the way of the bed
 M121 ; Pop - restore the feedrate and relative/absolute move status
