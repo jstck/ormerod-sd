@@ -1,11 +1,11 @@
 /*! Reprap Ormerod Web Control | by Matt Burnett <matt@burny.co.uk>. | open license
  */
-var ver = 0.77; //App version
+var ver = 0.79; //App version
 var polling = false; 
 var printing = false;
 var paused = false;
-var chart,chart2,ormerodIP,layerCount,currentLayer,objHeight,objTotalFilament,startingFilamentPos,objUsedFilament,printStartTime,gFilename,buffer,currentFilamentPos,timerStart,storage,layerHeight,lastUpdatedTime;
-var maxUploadBuffer = 1000;
+var chart,chart2,ormerodIP,layerCount,currentLayer,objHeight,objTotalFilament,startingFilamentPos,objUsedFilament,printStartTime,gFilename,ubuff,currentFilamentPos,timerStart,storage,layerHeight,lastUpdatedTime;
+var maxUploadBuffer = 1500;
 var messageSeqId = 0;
 
 //Temp/Layer Chart settings
@@ -21,21 +21,29 @@ var gFileIndex = 0;
 var macroGs = ['setbed.g'];
 var chevLeft = "<span class='glyphicon glyphicon-chevron-left'></span>";
 var chevRight = "<span class='glyphicon glyphicon-chevron-right'></span>";
-var lastProgress = 0;
+
+var gcodeDir = "gcodes/";
+var webDir = "www/";
+var sysDir = "sys/";
 
 jQuery.extend({
     askElle: function(reqType, code) {
         var result;
         var query = "";
         switch(reqType) {
-			case 'data':
+			case 'upload_data':
                 query = "?data="+code;		// 'code' has already been URI encoded
 				break;
             case 'gcode':
                 query = "?gcode="+encodeURIComponent(code);
                 break;
  			case 'fileinfo':
+			case 'upload_begin':
+			case 'delete':
 				query = "?name="+encodeURIComponent(code);
+				break;
+			case 'upload_end':
+				query = "?size="+code;
 				break;
         }
         var url = '//' + ormerodIP + '/rr_'+reqType+query;
@@ -113,6 +121,7 @@ $('#connect').on('click', function() {
         updatePage();
     } else {
         polling = true;
+		$.askElle("connect");
         updatePage();        
         listGFiles();
         $.askElle("gcode", "M115"); //get firmware
@@ -277,13 +286,17 @@ $("div#gFileList1, div#gFileList2, div#gFileList3")
 }).on('mouseout', 'div#gFileLink', function() {
     $(this).removeClass('file-grey');
 }).on('mouseover', 'span#fileDelete', function() {
-    $(this).parent().addClass('file-red');
+    $(this).parent().parent().parent().parent().parent().addClass('file-red');
 }).on('mouseout', 'span#fileDelete', function() {
-    $(this).parent().removeClass('file-red');
+    $(this).parent().parent().parent().parent().parent().removeClass('file-red');
 }).on('click', 'span#fileDelete', function() {
-    var filename = $(this).parent().text();
-    $.askElle('gcode', "M30 " + filename);
-    message('success', "G files [" + filename + "] Deleted from the SD card");
+    var filename = gcodeDir + $(this).parent().parent().text();
+    var resp = $.askElle('delete', filename);
+	if (resp.err == 0) {
+		message('success', "G file [" + filename + "] deleted from the SD card");
+	} else {
+		modalMessage("Delete failed", "Failed to delete file " + filename, true);
+	}
     listGFiles();
 });
 $("button#filereload").on('click', function() {
@@ -450,75 +463,76 @@ function fileDrop() {
     });
 }
 
-function handleFileDrop(data, fName, action) {
-    var ext = getFileExt(fName).toLowerCase();
-    if (ext === "g" || ext === "gco" || ext === "gcode" || (action === "htm" && (ext === "htm" || ext == "js" || ext == "css"))) {
-        gFileData = data;
-		gFileIndex = 0;
-        timer();
-        switch (action) {
-            case "config":
-                $.askElle('gcode', "M559 P"+fName);
-                gFilename = fName;
-                message("info", "Config file "+fName+" upload started");
-                uploadModal();
-                $('span#ulTitle').text("Uploading " + fName);
-				uploadLoop(action, "");
-                break;       
-            case "htm":
-				switch(ext) {
-					case "js":
-						gFilename = "js/" + fName;
-						break;
-					case "css":
-						gFilename = "css/" + fName;
-						break;
-					default:
-						gFilename = fName;
-						break;
-				}					
-                $.askElle('gcode', "M560 P"+gFilename);
-                uploadModal();
-                $('span#ulTitle').text("Uploading " + gFilename);
-                message("info", "Web interface file "+gFilename+" upload started");
-                uploadLoop(action, "");
-                break;              
-            case "upload":
-				uploadFile(fName, fName, "");
-                break;
-			case "uploadandprint":
-                gFilename = fName;
-				var tempFilename = "tempWebPrint.gcode";
-				uploadFile(fName, tempFilename, tempFilename);
-				break;
-        }
-    } else {
-        //alert('Not a G Code file');
-        modalMessage("File Error!", 'Not a valid file to print or upload', true);
-        return false;
-    }
+function getFileLength() {
+	var kbytes = gFileData.length/1024;
+	return (kbytes < 1000) ? kbytes.toFixed(0) + "Kb" : (kbytes/1024).toFixed(2) + "Mb";
 }
 
-function uploadFile(fromFile, toFile, printAfterUpload)
+function handleFileDrop(data, fName, action) {
+    var ext = getFileExt(fName).toLowerCase();
+	gFileData = data;
+	gFileIndex = 0;
+	timer();
+	switch (action) {
+		case "config":
+			uploadFile(action, fName, sysDir + gFilename, "");
+			break;       
+		case "htm":
+			switch(ext) {
+				case "js":
+					uploadFile(action, fName, webDir + "js/" + fName, "");
+					break;
+				case "css":
+					uploadFile(action, fName, webDir + "css/" + fName, "");
+					break;
+				case "eot":
+				case "svg":
+				case "ttf":
+				case "woff":
+					uploadFile(action, fName, webDir + "fonts/" + fName, "");
+					break;
+				case "png":
+					uploadFile(action, fName, webDir + "img/" + fName, "");
+					break;
+				default:
+					uploadFile(action, fName, webDir + fName, "");
+					break;
+			}					
+			break;              
+		case "upload":
+			uploadFile(action, fName, gcodeDir + fName, "");
+			break;
+		case "uploadandprint":
+			var tempFilename = "tempWebPrint.gcode";
+			uploadFile("upload", fName, gcodeDir + tempFilename, tempFilename);
+			break;
+	}
+}
+
+function uploadFile(action, fromFile, toFile, printAfterUpload)
 {
-	$.askElle('gcode', "M28 " + toFile);
-	if (fromFile == toFile)
-	{
-		message("info", "File Upload of " + fromFile + " started");
+	var resp = $.askElle('upload_begin', toFile);
+	if (resp.err == 0) {
+		ubuff = resp.ubuff;
+		if (fromFile == toFile)
+		{
+			message("info", "File Upload of " + fromFile + " started");
+		}
+		else
+		{
+			message("info", "File Upload of " + fromFile + " to " + toFile + " started");
+		}
+		gFilename = fromFile;
+		uploadModal();
+		uploadLoop(action, printAfterUpload);
+	} else {
+		uploadCantStart(toFile);
 	}
-	else
-	{
-		message("info", "File Upload of " + fromFile + " to " + toFile + " started");
-	}
-	gFilename = fromFile;
-	uploadModal();
-	$('span#ulTitle').text("Uploading " + fromFile);
-	uploadLoop("upload", printAfterUpload);
 }
 
 function printSDfile(fName)
 {
-	var info = $.askElle('fileinfo', fName);
+	var info = $.askElle('fileinfo', gcodeDir + fName);
 	var height = 0, filament = 0;
 	if (info.hasOwnProperty('height') && isNumber(info.height))
 	{
@@ -536,13 +550,16 @@ function printSDfile(fName)
 }
 
 function uploadModal() {
-    modalMessage('File Upload Status',"<span id='ulTitle'>File Upload Status</span>"+
-    "<div class='progress text-center'>"+
-    "<div id='ulProgress' class='progress-bar' role='progressbar' aria-valuenow='60' aria-valuemin='0' aria-valuemax='100' style='width: 0%'>"+
-    "<span id='ulProgressText' title=''></span>"+
-    "</div>"+
-    "<span id='ulOffBar'>0% Complete</span>"+
-    "</div>", false);
+    modalMessage('File Upload Status',
+		"<span id='ulTitle'>Uploading " + gFilename + " (" + getFileLength() + ")</span> <span id='ulProgressText' class='pull-right'></span>"+
+		"<progress id='ulProgressBar' style='width:100%' max='100' value='0'></progress>",
+		false);
+}
+
+function uploadCantStart(toFile)
+{
+	modalMessage("File upload failed", "Upload failed because file " + toFile + " could not be created.", true);
+	message("info", "Failed to create file " + toFile);
 }
 
 function readFile(file, onLoadCallback){
@@ -559,63 +576,60 @@ function clearSlic3rSettings() {
 function uploadLoop(action, fileToPrint) { //Web Printing/Uploading
     if (gFileIndex == gFileData.length) {
 		//Finished with Dropped file, stop loop, end tasks
-		var duration = (timer() - timerStart).toHHMMSS();
-		switch (action) {
-			case "upload":
-				$.askElle('gcode', "M29");
-				listGFiles();
-				if (fileToPrint != "")
-				{
-					$('div#modal').modal('hide');
-					printSDfile(fileToPrint);
-				}
-				else
-				{
-					$('span#ulTitle').text(gFilename + " Upload Complete in " + duration);
-					$('div#modal button#modalClose').removeClass('hidden');
-					message("info", gFilename + " Upload Complete in " + duration);     
-				}
-				break;
-			case "config":
-				$.askElle('gcode', "M29");
-				$.askElle("gcode", "M503"); //update config.g on setting view
-				$('span#ulTitle').text(gFilename + " Upload Complete in "+ duration);
-				$('div#modal button#modalClose').removeClass('hidden');
-				message("info", gFilename + " Upload Complete in "+ duration);
-				break;                    
-			case "htm":    
-				$.askElle('data', encodeURIComponent("<!-- **EoF** -->"));
-				$('span#ulTitle').text(gFilename + " Upload Complete in "+ duration);
-				$('div#modal button#modalClose').removeClass('hidden');
-				message("info", gFilename + " Upload Complete in "+ duration);
-				break;                    
+		var resp = $.askElle('upload_end', gFileData.length);
+		if (resp.err != 0) {
+			$('span#ulTitle').text(gFilename + " Upload Failed!");
+			$('span#ulProgressText').text("ERROR!");
+			$('div#modal button#modalClose').removeClass('hidden');
+			message("info", gFilename + " Upload Failed!");     
 		}
+		else {
+			var duration = (timer() - timerStart).toHHMMSS();
+			switch (action) {
+				case "upload":
+					listGFiles();
+					if (fileToPrint != "")
+					{
+						$('div#modal').modal('hide');
+						printSDfile(fileToPrint);
+					}
+					else
+					{
+						$('span#ulTitle').text(gFilename + " uploaded " + getFileLength() + " in " + duration);
+						$('div#modal button#modalClose').removeClass('hidden');
+						message("info", gFilename + " Upload Complete in " + duration);     
+					}
+					break;
+				case "config":
+					$.askElle("gcode", "M503"); //update config.g on setting view
+					// no break
+				case "htm":    
+					$('span#ulTitle').text(gFilename + " uploaded " + getFileLength() + " in " + duration);
+					$('div#modal button#modalClose').removeClass('hidden');
+					message("info", gFilename + " Upload Complete in "+ duration);
+					break;
+			}
+		}
+		gFileData = "";
 	}
 	else {
-		if (buffer == null || buffer < 500) {
-			var resp = $.askElle('status', '');
-			if (typeof resp != 'undefined') {
-				buffer = resp.buff;
-			} else {
-				buffer = 0;
-			}
-		}
 		var wait = 20;
+		var progress = Math.floor((100 * gFileIndex) / gFileData.length);
+		var lastProgress = progress;
 		if (paused == true) {
 			wait = 2000;
-		} else if (buffer >= 100) {
+		} else {
 			// Send a number of packets in quick succession while there is plenty of buffer space, to speed up the file upload.
-			// If we send too many then the user interface doesn't update often enough. Ten seems about right.
-			var i = 0;
+			// If we send too many then the user interface doesn't update often enough.
 			do {
 				webSend(action);
-				++i;
-			} while (i < 10 && gFileIndex < gFileData.length && buffer >= 600);
-			if (buffer >= 100) {
-				wait = 2;
+				progress = Math.floor((100 * gFileIndex) / gFileData.length);
+			} while (ubuff >= 600 && gFileIndex < gFileData.length && progress == lastProgress);
+			if (ubuff >= 200) {
+				wait = 1;
 			}
 		}	
-		setProgress(Math.floor((100 * gFileIndex) / gFileData.length), "ul", 0,0);
+		setProgress(progress, "ul", 0, 0);
 		setTimeout(function() {
 			uploadLoop(action, fileToPrint);
 		}, wait);
@@ -623,22 +637,22 @@ function uploadLoop(action, fileToPrint) { //Web Printing/Uploading
 }
 
 function webSend(action) { //Web Printing/Uploading
-	if (buffer > maxUploadBuffer) {
-        buffer = maxUploadBuffer;
+	if (ubuff > maxUploadBuffer) {
+        ubuff = maxUploadBuffer;
 	}
     if (gFileIndex < gFileData.length) {
 		var line = "";
-		while(gFileIndex < gFileData.length && line.length + 30 <= buffer) {	// keep going until less than 30 bytes free space left
-			var chunkSize = Math.min(Math.floor((buffer - line.length)/3), gFileData.length - gFileIndex);	// URIencoding a chunk increases its size by a factor of not more than 3
+		while(gFileIndex < gFileData.length && line.length + 30 <= ubuff) {	// keep going until less than 30 bytes free space left
+			var chunkSize = Math.min(Math.floor((ubuff - line.length)/3), gFileData.length - gFileIndex);	// URIencoding a chunk increases its size by a factor of not more than 3
 			line += encodeURIComponent(gFileData.substring(gFileIndex, gFileIndex + chunkSize));
 			gFileIndex += chunkSize;
         }
-        var resp = $.askElle('data', line); //send chunk of gcodes or html, and get buffer response
+        var resp = $.askElle('upload_data', line); //send chunk of gcodes or html, and get buffer response
         
         if (typeof resp != 'undefined') {
-            buffer = resp.buff;
+            ubuff = resp.ubuff;
         } else {
-            buffer = 0;
+            ubuff = 0;
         }
     }
 }
@@ -668,7 +682,8 @@ function listGFiles() {
                 $('div#quicks td:eq(0)').append('<a href="#" role="button" class="btn btn-default disabled" itemprop="M23 '+item+'\nM24" id="quickgfile">'+item+'</a>');
             }
         }
-        $('div#' + list).append('<div id="gFileLink" class="file-button"><span id="fileName" class="pull-left">' + item + '</span><span id="fileDelete" class="glyphicon glyphicon-trash pull-right"></span></div>');
+        $('div#' + list).append('<div id="gFileLink" class="file-button"><table style="width:100%"><tbody><tr><td style="width:90%;word-break:break-all"><span id="fileName">'
+			+ item + '</span></td><td style="width:10%"><span id="fileDelete" class="glyphicon glyphicon-trash pull-right"></span></td></tr></tbody></table></div>');
     });
 }
 
@@ -798,7 +813,6 @@ function updatePage() {
             messageSeqId = status.seq;
             parseResponse(status.resp);
         }
-        buffer = status.buff;
 		currentFilamentPos = status.extr[0];
         homedWarning(status.homed[0],status.homed[1],status.homed[2]);
 		if (status.status == "S") {
@@ -989,36 +1003,17 @@ function zeroPrefix(num) {
 }
 
 function setProgress(percent, bar, layer, layers) {
-	if (percent == 0 || percent != lastProgress) {
-		lastProgress = percent;
-		var barText = $('span#'+bar+'ProgressText');
-		var offText = $('span#'+bar+'OffBar');
-		var ptext = percent + "% Complete";
-		if (bar == 'print') {
-			if (layers > 0) {
-				ptext += ", Layer " + layer + " of " + layers;
-			}
-			if (objTotalFilament > 0) {
-				ptext += ", Filament " + (currentFilamentPos - startingFilamentPos) + " of " + objTotalFilament + "mm";
-			}
+	$('progress#'+bar+'ProgressBar').attr('value', percent);
+	var ptext = percent + "% Complete";
+	if (bar == 'print') {
+		if (layers > 0) {
+			ptext += ", Layer " + layer + " of " + layers;
 		}
-		
-		switch (true) {
-			case percent <= 40 && percent > 0:
-				barText.text('').attr('title', '');
-				offText.text(ptext).attr('title', ptext);
-				break;
-			case percent > 40:
-				barText.text(ptext).attr('title', ptext);
-				offText.text('').attr('title', '');
-				break;
-			default:
-				barText.text('').attr('title', '');
-				offText.text('0% complete');
-				break;
+		if (objTotalFilament > 0) {
+			ptext += ", Filament " + (currentFilamentPos - startingFilamentPos) + " of " + objTotalFilament + "mm";
 		}
-		$('div#'+bar+'Progress').css("width", percent + "%");
 	}
+	$('span#'+bar+'ProgressText').text(ptext);
 }
 
 function parseLayerData() {
