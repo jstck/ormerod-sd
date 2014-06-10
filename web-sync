@@ -1,0 +1,6 @@
+#!/bin/bash
+
+SOURCE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/../OrmerodWebControl/"
+TARGET="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/www/"
+
+rsync -av --exclude '.*' "$SOURCE" "$TARGET"
