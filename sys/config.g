@@ -3,6 +3,7 @@
 M111 S0; Debug off
 M80 ; ATX power on
 M106 S255; fan on
+M540 P0xBE:0xEF:0xC0:0xA8:0x00:0x0E ;Mac = BEEF+IP
 M550 POrmerod; Set the machine's name
 M551 P; Blank password
 M552 P192.168.0.14; Set the IP address
@@ -14,7 +15,7 @@ G21 ; Work in mm
 G90 ; Absolute positioning
 M83 ; Extrusions relative
 M558 P1 ; Turn Z Probe on
-G31 Z0.9 P600 ; Set Z probe height and threshold
+G31 Z1.0 P600 ; Set Z probe height and threshold
 M906 X800 Y1000 Z800 E1200 ; Motor currents (mA)
 M203 X10000 Y10000 Z500 E3000 ; movement max speeds
 M201 X1000 Y1000 Z15 E1000; acceleration tweaks for improved finish

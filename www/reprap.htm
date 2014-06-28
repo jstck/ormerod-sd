@@ -1,16 +1,14 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-<title>Ormerod Control v0.90</title>
+<title>Ormerod Control v0.95</title>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- Bootstrap -->
-<link href="css/bootstrap.min.css" type="text/css" 
-rel="stylesheet" />
-<link href="css/main.css"  type="text/css" 
-rel="stylesheet" />
-<link href="favicon.ico" type="image/x-icon" 
-rel="icon" />        
+<link href="css/bootstrap.min.css" type="text/css" rel="stylesheet" />
+<link href="css/main.css" type="text/css" rel="stylesheet" />
+<link href="css/bootstrap-slider.min.css" type="text/css" rel="stylesheet" />
+<link href="favicon.ico" type="image/x-icon" rel="icon" />        
 <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elmnts and media queries -->
 <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
 <!--[if lt IE 9]>
@@ -20,12 +18,12 @@ rel="icon" />
 </head>
 <body>
 <!-- Wrap all page content here -->
-<div id="wrap">      
+<div id="wrap">
 <nav class="navbar navbar-default" role="navigation">
 <!-- Brand and toggle get grouped for better mobile display -->
 <div class="navbar-header">
 <a class="navbar-brand" href="#">
-<span id="machineName" style="font-weight:bold>RepRapPro Ormerod</span>
+<span id="machineName" style="font-weight:bold">RepRapPro Ormerod</span>
 <small>- <span id="hostLocation"></span></small>
 </a>
 </div>
@@ -42,7 +40,7 @@ title="Drop a Gcode file here to upload it to a temporary file and then print it
 <div class="input-group">
 <div class="input-group-btn" id='sendG'>
 <button type="button" id='txtinput' class="btn btn-default">Send GCode</button>
-<button type="button" class="btn btn-default dropdown-toggle" 
+<button type="button" class="btn btn-default dropdown-toggle"
 data-toggle="dropdown">
 <span class="caret"></span>
 </button>
@@ -66,33 +64,29 @@ data-toggle="dropdown">
 </div>
 <div class="col-md-1">
 <form class="navbar-form navbar-right">
-<button type="button" id="printing" class="btn btn-danger active disabled" 
-value="0">Inactive</button>
+<button type="button" id="printing" class="btn btn-danger active disabled" value="0">Inactive</button>
 </form>
 </div>
 </div><!-- /.navbar-collapse -->
 </nav>
 <!-- Begin page content -->
 <div class="container">
-<div class="row"> 
+<div class="row">
 <!-- panic buttions -->
 <div class="col-md-1">
-<button type="button" id="connect" class="btn btn-danger disabled" 
-value="0">Connect</button>   
+<button type="button" id="connect" class="btn btn-danger disabled" value="0">Connect</button>
 <div id="panicBtn" style="margin-top: 5px">
-<button type="button" value='M112' id='stop' 
-class="btn btn-danger btn-block disabled" 
-title="M112, moves in progress are immediately terminated,
-shuts down, motors/heaters turned off.
-Requires reset button on duet to restart">STOP!</button>
-<button type="button" value='M25' id='pause' 
-class="btn btn-info btn-block disabled" 
+<button type="button" value='M112' id='stop'
+class="btn btn-danger btn-block disabled"
+title="M112, moves in progress are immediately terminated, shuts down, motors/heaters turned off. Requires reset button on duet to restart">STOP!</button>
+<button type="button" value='M25' id='pause'
+class="btn btn-info btn-block disabled"
 title='Pause printing, Resumeable'>Pause</button>
-<button type="button" value='reset' id='reset' 
-class="btn btn-success btn-block hidden" 
-title='Pause before reset'>Reset</button>      
+<button type="button" value='reset' id='reset'
+class="btn btn-success btn-block hidden"
+title='Pause before reset'>Reset</button>
 </div>
-</div>                    
+</div>
 <div class="col-md-6">
 <!-- Temp control/chart -->
 <table class="table table-bordered" id="temp">
@@ -119,11 +113,11 @@ title='Pause before reset'>Reset</button>
 </button>
 <ul class="dropdown-menu">
 <li class="divider"></li>
-<li><a href="#" id='addHeadTemp'>Add Temp</a></li>                                                
+<li><a href="#" id='addHeadTemp'>Add Temp</a></li>
 </ul>
 </div><!-- /btn-group -->
 <input type="text" id='headTempInput' class="form-control">
-</div><!-- /input-group -->  
+</div><!-- /input-group -->
 </td>
 </tr>
 <tr>
@@ -142,13 +136,13 @@ title='Pause before reset'>Reset</button>
 </ul>
 </div><!-- /btn-group -->
 <input type="text" id='bedTempInput' class="form-control">
-</div><!-- /input-group -->                                        
+</div><!-- /input-group -->
 </td>
-</tr>                                
+</tr>
 </tbody>
-</table>   
+</table>
 </div>
-<div class="col-md-5">    
+<div class="col-md-5">
 <!-- head pos -->
 <table class="table table-bordered" id="headPos">
 <tbody>
@@ -176,12 +170,13 @@ title='Pause before reset'>Reset</button>
 <ul class="nav nav-tabs" id="tabs">
 <li class="active"><a href="#control" data-toggle="tab">Control</a></li>
 <li><a href="#printview" data-toggle="tab">Print Status</a></li>
-<li><a href="#gcodefiles" data-toggle="tab">Gcode Files</a></li>                        
+<li><a href="#gcodefiles" data-toggle="tab">Gcode Files</a></li>
 <li><a href="#messages" data-toggle="tab">Message Log</a></li>
 <li><a href="#settings" data-toggle="tab">Settings</a></li>
 </ul>
 <!-- Tab panes -->
 <div class="tab-content">
+<!-- Control pane -->
 <div class="tab-pane active" id="control">
 <br />
 <div class="col-md-8">
@@ -190,17 +185,17 @@ title='Pause before reset'>Reset</button>
 <tbody>
 <tr>
 <td>
-<button type="button" value='G28' id='homeAll' 
-class="btn btn-primary btn-sm center-block disabled" 
+<button type="button" value='G28' id='homeAll'
+class="btn btn-primary btn-sm center-block disabled"
 title='Disables stepper motors and allows axis to move freely.'>Home All
 </button>
 </td>
 <th colspan="2">
 <div class="col-md-11 text-center">Move Head Position</div>
 </th>
-</tr>                                
+</tr>
 <tr>
-<td><button type="button" value="G28 X0" id="homeX" 
+<td><button type="button" value="G28 X0" id="homeX"
 class="btn btn-primary center-block disabled">Home X
 </button></td>
 <td>
@@ -213,7 +208,7 @@ class="btn btn-primary center-block disabled">Home X
 </td>
 </tr>
 <tr>
-<td><button type="button" value="G28 Y0" id="homeY" 
+<td><button type="button" value="G28 Y0" id="homeY"
 class="btn btn-primary center-block disabled">Home Y
 </button></td>
 <td class="">
@@ -226,7 +221,7 @@ class="btn btn-primary center-block disabled">Home Y
 </td>
 </tr>
 <tr>
-<td><button type="button" value="G28 Z0" id="homeZ" 
+<td><button type="button" value="G28 Z0" id="homeZ"
 class="btn btn-primary center-block disabled">Home Z
 </button></td>
 <td>
@@ -237,7 +232,7 @@ class="btn btn-primary center-block disabled">Home Z
 <div class="btn-group" id="Zplus">
 </div>
 </td>
-</tr>                        
+</tr>
 </tbody>
 </table>
 </div>
@@ -279,15 +274,15 @@ Feed Direction
 <td colspan="2">
 <span>Feed</span>
 <div class="btn-group" id="feed">
-<button type="button" class="btn btn-default disabled" id="feed" 
+<button type="button" class="btn btn-default disabled" id="feed"
 value="1">1mm</button>
-<button type="button" class="btn btn-default disabled" id="feed" 
+<button type="button" class="btn btn-default disabled" id="feed"
 value="5">5mm</button>
-<button type="button" class="btn btn-default disabled" id="feed" 
+<button type="button" class="btn btn-default disabled" id="feed"
 value="10">10mm</button>
-<button type="button" class="btn btn-default disabled" id="feed" 
+<button type="button" class="btn btn-default disabled" id="feed"
 value="50">50mm</button>
-<button type="button" class="btn btn-default disabled" id="feed" 
+<button type="button" class="btn btn-default disabled" id="feed"
 value="100">100mm</button>
 </div>
 </td>
@@ -298,29 +293,30 @@ value="100">100mm</button>
 <div class="col-md-12" id="quicks">
 <!-- Quick Commands -->
 <table class="table table-bordered">
-<tr><td>
+<tr><td id="quick_commands">
 <p><strong>Quick Commands</strong></p>
-<a href="#" role="button" class="btn btn-primary disabled" itemprop="M18" 
+<a href="#" role="button" class="btn btn-primary disabled" itemprop="M18"
 title='Disables stepper motors and allows axes to move freely'>Motors Off</a>
-<a href="#" role="button" class="btn btn-default disabled" 
+<a href="#" role="button" class="btn btn-default disabled"
 title="Set Absolute Z zero">G92 Z0</a>
-<a href="#" role="button" class="btn btn-default disabled" 
+<a href="#" role="button" class="btn btn-default disabled"
 title="Move X & Y axes to zero">G1 X0 Y0 F6000</a>
-<a href="#" role="button" class="btn btn-default disabled" 
+<a href="#" role="button" class="btn btn-default disabled"
 title="Move Z axis to zero">G1 Z0</a>
-<a href="#" role="button" class="btn btn-default disabled" 
+<a href="#" role="button" class="btn btn-default disabled"
 title="Move X & Y to Bed Centre">G1 X100 Y100 F6000</a>
 </td></tr>
 </table>
 </div>
 </div>
+<!-- Print status pane -->
 <div class="tab-pane" id="printview">
 <br />
 <div class="col-md-10 col-md-offset-1" style="margin-bottom:20px">
 <span id="gFileDisplay"></span> <span id="printProgressText" class="pull-right"></span>
 <progress id="printProgressBar" style="width:100%; display:none" value="0" max="100"></progress>
 </div>
-<div class="col-md-2 col-md-offset-1">
+<div class="col-md-2">
 <table class="table table-bordered" id="slic3r">
 <tbody>
 </tbody>
@@ -338,7 +334,7 @@ title="Move X & Y to Bed Centre">G1 X100 Y100 F6000</a>
 <td rowspan="3">
 <div class="text-center" style="font-weight:bold">Print time by layer</div>
 <div id="layerChart" class="center-block"></div>
-</td> 
+</td>
 </tr>
 <tr>
 <th>Print Duration</th>
@@ -347,7 +343,7 @@ title="Move X & Y to Bed Centre">G1 X100 Y100 F6000</a>
 <tr>
 <td><span id="elapsed">00:00:00</span></td>
 <td><span id="lastlayer">00:00:00</span></td>
-</tr>                                    
+</tr>
 </tbody>
 </table>
 <table class="table table-bordered" id="finish">
@@ -357,36 +353,51 @@ title="Move X & Y to Bed Centre">G1 X100 Y100 F6000</a>
 </tr>
 <tr>
 <td>Based On</td>
-<td>Last Layer</td>
-<td>Avg. All Layers</td>
-<td>Avg. Last 5 Layers</td>
+<td>Layer time</td>
 <td>Filament usage</td>
 </tr>
 <tr>
 <td>Est. Time Left</td>
-<td><span id="llTimeR">00:00:00</span></td>
-<td><span id="avgAllR">00:00:00</span></td>
 <td><span id="avg5R">00:00:00</span></td>
 <td><span id="filTimeR">00:00:00</span></td></tr>
 <tr>
 <td>Est. End Time</td>
-<td><span id="llTime">00:00:00</span></td>
-<td><span id="avgAll">00:00:00</span></td>
 <td><span id="avg5">00:00:00</span></td>
 <td><span id="filTime">00:00:00</span></td>
-</tr>                                         
+</tr>
 </tbody>
-</table>  
+</table>
+</div>
+<div class="col-md-2">
+<table class="table table-bordered" id="printControl">
+<tbody>
+<tr>
+<th colspan="2" class="text-center">Print Control</th>
+</tr>
+<tr>
+<td width="50%">Speed</td>
+<td width="50%">Extrusion</td>
+</tr>
+<tr>
+<td><input id="sFactor" type="text"></td>
+<td><input id="eFactor" type="text"></td>
+</tr>
+<tr>
+<td><span id="sPercent">100</span>%</td>
+<td><span id="ePercent">100</span>%</td>
+</tr>
+</table>
 </div>
 </div>
+<!-- SD gcode files pane -->
 <div class="tab-pane" id="gcodefiles">
 <br />
-<div class="col-md-10 col-md-offset-1">
+<div class="col-md-10">
 <!-- Gfiles list -->
 <div class="panel panel-default">
 <div class="panel-body">
 <div class="col-md-3">
-<button type="button" id="uploadGfile" class="btn btn-default btn-lg disabled" 
+<button type="button" id="uploadGfile" class="btn btn-default btn-lg disabled"
 title="Drop a G file here to
 Upload it to the Duets SD card">SD Upload Drop</button>
 </div>
@@ -396,9 +407,9 @@ Upload it to the Duets SD card">SD Upload Drop</button>
 <input type="file" id="uploadGselect" style="display:none">
 <input type="file" id="ulConfigGselect" style="display:none">
 <input type="file" id="ulReprapHTMselect" style="display:none">
-</div>  
+</div>
 <div class="col-md-6">
-</div>                                        
+</div>
 </div>
 </div>
 <div class="panel panel-default">
@@ -412,11 +423,11 @@ Upload it to the Duets SD card">SD Upload Drop</button>
 <div class="col-md-4 btn-group-vertical" id="gFileList2">
 </div>
 <div class="col-md-4 btn-group-vertical" id="gFileList3">
-</div>      
 </div>
 </div>
 </div>
-</div>     
+</div>
+</div>
 <div class="tab-pane" id="messages" style="overflow-y: scroll; height: 380px">
 <br />
 <div class="col-md-10 col-md-offset-1 panel panel-default">
@@ -424,7 +435,7 @@ Upload it to the Duets SD card">SD Upload Drop</button>
 <div class="col-md-1"><strong>Messages:</strong></div>
 <div class="col-md-2 col-md-offset-7 checkbox">
 <label>
-<input type="checkbox" id="noOK" /> Show 'ok' 
+<input type="checkbox" id="noOK" /> Show 'ok'
 </label>
 </div>
 <div class="col-md-1">
@@ -449,32 +460,32 @@ Upload it to the Duets SD card">SD Upload Drop</button>
 <div class="form-group">
 <label class="control-label">Duet Firmware</label>
 <p class="form-control-static" id="firmVer"></p>
-</div>    
-</td>                                        
+</div>
+</td>
 </tr>
 <tr>
 <td>
 <div class="form-group">
 <label class="control-label">reprap.htm</label>
 <p class="form-control-static" id="htmVer"></p>
-</div>    
-</td>                                        
-</tr> 
+</div>
+</td>
+</tr>
 <tr>
 <td>
 <div class="form-group">
 <label class="control-label">reprap.js</label>
 <p class="form-control-static" id="jsVer"></p>
-</div>    
-</td>                                        
-</tr>                                     
+</div>
+</td>
+</tr>
 </tbody>
 </table>
 </div>
 <div class="col-md-4">
 <table class="table table-bordered" id="settingParam">
 <tbody>
-<tr>                            
+<tr>
 <th class="text-center" colspan="2">Parameters</th>
 </tr>
 <tr>
@@ -493,37 +504,37 @@ Upload it to the Duets SD card">SD Upload Drop</button>
 <br />
 <button type="button" id="saveSettings" class="btn btn-default">
 Apply & Save</button>
-<button type="button" id="delSettings" class="btn btn-default" 
+<button type="button" id="delSettings" class="btn btn-default"
 title="Reset all settings, and Custom Temps/Buttons">Reset All</button>
-</form>                                        
+</form>
 </td>
 <td>
 <div class="form-group">
 <label for="pollDelay" class="control-label">UI refresh ms</label>
-<input type="text" class="form-control" id="pollDelay" 
-title="Setting this to small can cause the Duet to crash (default:1000)" 
+<input type="text" class="form-control" id="pollDelay"
+title="Setting this to small can cause the Duet to crash (default:1000)"
 value="1000" />
-</div> 
+</div>
 </td>
-</tr>                                    
+</tr>
 </tbody>
 </table>
 </div>
 <div class="col-md-3">
 <table class="table table-bordered col-md-3" id="settingSD">
 <tbody>
-<tr>                             
+<tr>
 <th class="text-center">SD sys & www</th>
 </tr>
 <tr>
 <td class="text-center">
 <br />
-<button type="button" id="ulConfigG" class="btn btn-default btn-lg disabled" 
+<button type="button" id="ulConfigG" class="btn btn-default btn-lg disabled"
 title="Upload a new file to the sys directory, replaces old file">Upload config file</button>
 <br /><br />
 <button type="button" id="ulReprapHTM" class="btn btn-default btn-lg disabled"
 title="Upload a new web interface file, replaces old file">
-Upload web file</button>                                            
+Upload web file</button>
 <br /><br />
 </td>
 </tr>
@@ -532,20 +543,20 @@ Upload web file</button>
 </div>
 <div class="col-md-10 col-md-offset-1 btn-group-vertical" id="config">
 <br /><strong>Config.g file</strong><br />
-</div>                            
 </div>
 </div>
 </div>
 </div>
-</div>  
+</div>
+</div>
 <div id="footer">
 <div class="container text-middle">
-<p class="text-muted"><small><a href="//forums.reprap.org/read.php?340,290811" 
+<p class="text-muted"><small><a href="//forums.reprap.org/read.php?340,290811"
 target="_blank">get help here</a>
 <span class="pull-right">Web Interface by iamburny :) </span></small>
 </p>
 </div>
-</div>     
+</div>
 <div class="modal fade" id="modal">
 <div class="modal-dialog">
 <div class="modal-content">
@@ -556,7 +567,7 @@ target="_blank">get help here</a>
 <div class="modal-body">
 </div>
 <div class="modal-footer">
-<button type="button" id="modalClose" class="btn btn-default hidden" 
+<button type="button" id="modalClose" class="btn btn-default hidden"
 data-dismiss="modal">Close</button>
 <button type="button" id="modalSave" class="btn btn-primary hidden">
 Save changes</button>
@@ -573,6 +584,8 @@ Save changes</button>
 <script src="js/jquery.flot.min.js"></script>
 <script src="js/jquery.flot.navigate.js"></script>
 <script src="js/jquery.filedrop.min.js"></script>
+<script src="js/bootstrap-slider.js"></script>
 <script src="js/reprap.js"></script>
+<script src="js/settings.js"></script>
 </body>
 </html>
