@@ -5,7 +5,7 @@ M80 ; ATX power on
 M106 S255; fan on
 M540 P0xBE:0xEF:0xC0:0xA8:0x00:0x0E ;Mac = BEEF+IP
 M550 POrmerod; Set the machine's name
-M551 P; Blank password
+M551 Pfoo; Blank password
 M552 P192.168.0.14; Set the IP address
 M553 P255.255.255.0; Set netmask
 M554 P192.168.0.1; Set the gateway
@@ -20,4 +20,4 @@ M906 X800 Y1000 Z800 E1200 ; Motor currents (mA)
 M203 X10000 Y10000 Z500 E3000 ; movement max speeds
 M201 X1000 Y1000 Z15 E1000; acceleration tweaks for improved finish
 M208 X205 Y200 Z180 ; max travel - allow some "X overshoot" for probing
-T1 ; Select extruder 0
+M563 P1 D0 H1 ; Define tool 1

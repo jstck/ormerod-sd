@@ -1,14 +1,15 @@
 /*! Reprap Ormerod Web Control | by Matt Burnett <matt@burny.co.uk>. | open license
  */
-var ver = 0.97; //App version
+var ver = 0.98; //App version
 var polling = false; 
 var printing = false;
 var paused = false;
-var chart,chart2,ormerodIP,layerCount,currentLayer,objHeight,objTotalFilament,startingFilamentPos,objUsedFilament,printStartTime,gFilename,ubuff,currentFilamentPos,timerStart,storage,layerHeight,lastUpdatedTime;
-var sFactor = 100;
-var eFactor = 100;
+var chart,chart2,ormerodIP,layerCount,currentLayer,objHeight,objTotalFilament,printStartTime,gFilename,ubuff,timerStart,storage,layerHeight,lastUpdatedTime;
+var startingFilamentPos = [], currentFilamentPos = [], objUsedFilament = [];
+var sFactor = 100, e1Factor = 100, e2Factor = 100;
 var maxUploadBuffer = 2000;
 var messageSeqId = 0;
+var currentTool = 0;
 
 //Temp/Layer Chart settings
 var maxDataPoints = 200;
@@ -82,8 +83,8 @@ $(document).ready(function() {
 
     //chart line colours
     $('#bedTxt').css("color", bedColour);
-    $('#head1Txt').css("color", head1Colour);
-    $('#head2Txt').css("color", head2Colour);
+    $('#head1Click').css("color", head1Colour);
+    $('#head2Click').css("color", head2Colour);
 
     chart = $.plot("#tempchart", chartData, {
         series: {shadowSize: 0},
@@ -149,18 +150,22 @@ $('div#bedTemperature').on('click', 'a#bedTempLink', function() {
     $.askElle('gcode', "M140 S" + $(this).text());
 });
 $('div#head1Temperature button#setHead1Temp').on('click', function() {
-        $.askElle('gcode', "G10 P1 S" + $('input#head1TempInput').val() + "\nT1");
+	var cmd = "G10 P1 S" + $('input#head1TempInput').val();
+	$.askElle('gcode', (currentTool == 1) ? cmd : cmd + "\nT1");
 });
 $('div#head2Temperature button#setHead2Temp').on('click', function() {
-        $.askElle('gcode', "G10 P2 S" + $('input#head2TempInput').val() + "\nT2");
+	var cmd = "G10 P2 S" + $('input#head1TempInput').val();
+	$.askElle('gcode', (currentTool == 2) ? cmd : cmd + "\nT2");
 });
 $('div#head1Temperature').on('click', 'a#head1TempLink', function() {
     $('input#head1TempInput').val($(this).text());
-    $.askElle('gcode', "G10 P1 S" + $(this).text() + "\nT1");
+	var cmd = "G10 P1 S" + $(this).text();
+    $.askElle('gcode', (currentTool == 1) ? cmd : cmd + "\nT1");
 });
 $('div#head2Temperature').on('click', 'a#head2TempLink', function() {
     $('input#head2TempInput').val($(this).text());
-    $.askElle('gcode', "G10 P2 S" + $(this).text() + "\nT1");
+ 	var cmd = "G10 P2 S" + $(this).text();
+	$.askElle('gcode', (currentTool == 2) ? cmd : cmd + "\nT2");
 });
 $('input#bedTempInput').keydown(function(event) {
     if (event.which === 13) {
@@ -171,47 +176,43 @@ $('input#bedTempInput').keydown(function(event) {
 $('input#head1TempInput').keydown(function(event) {
     if (event.which === 13) {
         event.preventDefault();
-        $.askElle('gcode', "G10 P1 S" + $(this).val() + "\nT1");
+		var cmd = "G10 P1 S" + $(this).val();
+        $.askElle('gcode', (currentTool == 1) ? cmd : cmd + "\nT1");
     }
 });
 $('input#head2TempInput').keydown(function(event) {
     if (event.which === 13) {
         event.preventDefault();
-        $.askElle('gcode', "G10 P2 S" + $(this).val() + "\nT2");
+		var cmd = "G10 P2 S" + $(this).val();
+        $.askElle('gcode', (currentTool == 2) ? cmd : cmd + "\nT2");
     }
 });
 $('div#bedTemperature ul').on('click', 'a#addBedTemp', function() {
     var tempVal = $('input#bedTempInput').val();
     if (tempVal != "") {
         var temps = storage.get('temps', 'bed');
-        temps.unshift(parseInt(tempVal));
-        storage.set('temps.bed', temps);
-        loadSettings();
+		var newTemp = parseInt(tempVal);
+		if (temps.indexOf(newTemp) < 0) {
+			temps.push(newTemp);
+			temps.sort(function(a, b){return b-a});
+			storage.set('temps.bed', temps);
+			loadSettings();
+		}
     }else{
         modalMessage("Error Adding Bed Temp!", "You must enter a Temperature to add it to the dropdown list", close);
     }
 });
 $('div#head1Temperature ul').on('click', 'a#addHead1Temp', function() {
-    var tempVal = $('input#head1TempInput').val();
-    if (tempVal != "") {
-        var temps = storage.get('temps', 'head');
-        temps.unshift(parseInt(tempVal));
-        storage.set('temps.head', temps);
-        loadSettings();
-    }else{
-        modalMessage("Error Adding Head Temp!", "You must enter a Temperature to add it to the dropdown list", close);
-    }
+    addHeadTemp($('input#head1TempInput').val());
 });
 $('div#head2Temperature ul').on('click', 'a#addHead2Temp', function() {
-    var tempVal = $('input#head2TempInput').val();
-    if (tempVal != "") {
-        var temps = storage.get('temps', 'head');
-        temps.unshift(parseInt(tempVal));
-        storage.set('temps.head', temps);
-        loadSettings();
-    }else{
-        modalMessage("Error Adding Head Temp!", "You must enter a Temperature to add it to the dropdown list", close);
-    }
+    addHeadTemp($('input#head2TempInput').val());
+});
+$('a#head1Click').on('click', function() {
+	$.askElle('gcode', (currentTool == 1) ? "T0" : "T1");
+});
+$('a#head2Click').on('click', function() {
+	$.askElle('gcode', (currentTool == 2) ? "T0" : "T2");
 });
 
 //feed controls
@@ -310,15 +311,20 @@ $('div#panicBtn button').on('click', function() {
 
 //sliders
 $('#sFactor').slider({orientation:'vertical', reversed:true, min:10, max:300, step:10, value:100, tooltip:'show'});
-$('#eFactor').slider({orientation:'vertical', reversed:true, min:80, max:120, step:1, value:100, tooltip:'show'});
+$('#e1Factor').slider({orientation:'vertical', reversed:true, min:80, max:120, step:1, value:100, tooltip:'show'});
+$('#e2Factor').slider({orientation:'vertical', reversed:true, min:80, max:120, step:1, value:100, tooltip:'show'});
 
 $("#sFactor").on('slide', function(slideEvt) {
 	sFactor = slideEvt.value;
 	$("span#sPercent").text(sFactor);
 });
-$("#eFactor").on('slide', function(slideEvt) {
-	eFactor = slideEvt.value;
-	$("span#ePercent").text(eFactor);
+$("#e1Factor").on('slide', function(slideEvt) {
+	e1Factor = slideEvt.value;
+	$("span#e1Percent").text(e1Factor);
+});
+$("#e2Factor").on('slide', function(slideEvt) {
+	e2Factor = slideEvt.value;
+	$("span#e2Percent").text(e2Factor);
 });
 
 $("#sFactor").on('slideStop', function(slideEvt) {
@@ -326,27 +332,31 @@ $("#sFactor").on('slideStop', function(slideEvt) {
 	$("span#sPercent").text(sFactor);
 	$.askElle('gcode', "M220 S"+sFactor);
 });
-$("#eFactor").on('slideStop', function(slideEvt) {
-	eFactor = slideEvt.value;
-	$("span#ePercent").text(eFactor);
-	$.askElle('gcode', "M221 S"+eFactor);
+$("#e1Factor").on('slideStop', function(slideEvt) {
+	e1Factor = slideEvt.value;
+	$("span#e1Percent").text(e1Factor);
+	$.askElle('gcode', "M221 D0 S"+e1Factor);
+});
+$("#e2Factor").on('slideStop', function(slideEvt) {
+	e2Factor = slideEvt.value;
+	$("span#e2Percent").text(e2Factor);
+	$.askElle('gcode', "M221 D1 S"+e2Factor);
 });
 
 //g files
 $("div#gFileList1, div#gFileList2, div#gFileList3")
-.on('click', 'div#gFileLink', function() {
-    var danger = this.className.indexOf("file-red");
-    if (danger < 0) {
-		printSDfile($(this).text());
-    }
-}).on('mouseover', 'div#gFileLink', function() {
-    $(this).addClass('file-grey');
-}).on('mouseout', 'div#gFileLink', function() {
-    $(this).removeClass('file-grey');
-}).on('mouseover', 'span#fileDelete', function() {
+.on('mouseover', 'span#fileDelete', function() {
     $(this).parent().parent().parent().parent().parent().addClass('file-red');
 }).on('mouseout', 'span#fileDelete', function() {
     $(this).parent().parent().parent().parent().parent().removeClass('file-red');
+}).on('mouseover', 'span#filePrint', function() {
+    $(this).parent().parent().parent().parent().parent().addClass('file-green');
+}).on('mouseout', 'span#filePrint', function() {
+    $(this).parent().parent().parent().parent().parent().removeClass('file-green');
+}).on('mouseover', 'span#fileInfo', function() {
+    $(this).parent().parent().parent().parent().parent().addClass('file-blue');
+}).on('mouseout', 'span#fileInfo', function() {
+    $(this).parent().parent().parent().parent().parent().removeClass('file-blue');
 }).on('click', 'span#fileDelete', function() {
     var filename = gcodeDir + $(this).parent().parent().text();
     var resp = $.askElle('delete', filename);
@@ -356,6 +366,11 @@ $("div#gFileList1, div#gFileList2, div#gFileList3")
 		modalMessage("Delete failed", "Failed to delete file " + filename, true);
 	}
     listGFiles();
+}).on('click', 'span#filePrint', function() {
+    var filename = $(this).parent().parent().text();
+	printSDfile(filename);
+}).on('click', 'span#fileInfo', function() {
+	showFileInfo(gcodeDir + $(this).parent().parent().text());
 });
 $("button#filereload").on('click', function() {
     $('span#ulTitle').text("File Upload Status");
@@ -421,6 +436,21 @@ $('a[data-toggle="tab"]').on('show.bs.tab', function(e) {
 $("div#messages button#clearLog").on('click', function(){
     message('clear', '');
 });
+
+function addHeadTemp(tempVal) {
+    if (tempVal != "") {
+        var temps = storage.get('temps', 'head');
+		var newTemp = parseInt(tempVal);
+		if (temps.indexOf(newTemp) < 0) {
+			temps.push(newTemp);
+			temps.sort(function(a, b){return b-a});
+			storage.set('temps.head', temps);
+			loadSettings();
+		}
+    }else{
+        modalMessage("Error Adding Head Temp!", "You must enter a Temperature to add it to the dropdown list", close);
+    }
+}
 
 function getCookies() {
     //if none use defaults here, probably move them elsewhere at some point!
@@ -591,30 +621,58 @@ function uploadFile(action, fromFile, toFile, printAfterUpload)
 	}
 }
 
-function printSDfile(fName)
-{
-	clearSlic3rSettings();
-	var info = $.askElle('fileinfo', gcodeDir + fName);
-	var height = 0, filament = 0;
-	layerHeight = 0;
+// Update a table with file info and return [layerHeight, height, filament]
+function updateFileInfo(fileName, id) {
+	clearSlic3rSettings(id);
+	var height = 0, filament = 0, locLayerHeight = 0;
+	var info = $.askElle('fileinfo', fileName);
 	if (info.hasOwnProperty('height') && isNumber(info.height))
 	{
 		height = info.height;
 	}
-	if (info.hasOwnProperty('filament') && isNumber(info.filament) && info.filament != 0)
+	if (info.hasOwnProperty('filament'))
 	{
-		filament = info.filament;
-		addSlic3rSetting("Filament Needed", filament + "mm");
+		if ($.isArray(info.filament)) {
+			if (info.filament.length != 0) {
+				// Duet firmware 0.78d-dc42 and later return an array of filament lengths needed. For now we just total them.
+				var fils = "";
+				for(var i = 0; i < info.filament.length; ++i) {
+					filament += info.filament[i];
+					if (i != 0) {
+						fils += ' + ';
+					}
+					fils += info.filament[i];
+				}
+				addSlic3rSetting(id, "Filament Needed", fils + "mm");
+			}
+		}
+		else if (isNumber(info.filament) && info.filament != 0) {
+			filament = info.filament;
+			addSlic3rSetting(id, "Filament Needed", filament + "mm");
+		}
 	}
 	if (info.hasOwnProperty('layerHeight') && isNumber(info.layerHeight) && info.layerHeight != 0)
 	{
-		layerHeight = info.layerHeight;
-		addSlic3rSetting("Layer Height", layerHeight + "mm");
+		locLayerHeight = info.layerHeight;
+		addSlic3rSetting(id, "Layer height", info.layerHeight + 'mm');
 	}
 	if (info.hasOwnProperty('generatedBy') && info.generatedBy.length != 0)
 	{
-		addSlic3rSetting("Generated By", info.generatedBy);
+		addSlic3rSetting(id, "Generated by", info.generatedBy);
 	}
+	if (info.hasOwnProperty('size') && isNumber(info.size)) {
+		var sizeText = (info.size >= 1048576) ? (info.size/1048576).toFixed(3) + 'Mb' : (info.size >= 1024) ? (info.size/1024).toFixed(3) + 'Kb' : info.size + 'b';
+		addSlic3rSetting(id, "File size", sizeText);
+	}
+	return [locLayerHeight, height, filament];
+}
+
+function printSDfile(fName)
+{
+	var temp = updateFileInfo(gcodeDir + fName, 'slic3rMain');
+	layerHeight = temp[0];
+	var height = temp[1], filament = temp[2];
+	
 	$.askElle('gcode', "M23 " + fName + "\nM24");
 	message('success', "File [" + fName + "] sent to print");
 	$('span#gFileDisplay').html('<strong>Printing ' + fName + ' from Duet SD card</strong>');
@@ -643,12 +701,12 @@ function readFile(file, onLoadCallback){
     reader.readAsText(file);
 }
 
-function clearSlic3rSettings() {
-    $('table#slic3r tbody').html(''); //slic3r setting <table>
+function clearSlic3rSettings(id) {
+    $('table#' + id + ' tbody').html(''); //slic3r setting <table>
 }
 
-function addSlic3rSetting(key, data) {
-	$('table#slic3r tbody').append('<tr><th>'+key+'</th></tr><tr><td>'+data+'</td></tr>');
+function addSlic3rSetting(id, key, data) {
+	$('table#' + id + ' tbody').append('<tr><th>'+key+'</th></tr><tr><td>'+data+'</td></tr>');
 }
 
 function uploadLoop(action, fileToPrint) { //Web Printing/Uploading
@@ -768,8 +826,12 @@ function listGFiles() {
                 $('table#quicks td:eq(0)').append('<a href="#" role="button" class="btn btn-default disabled" itemprop="M23 '+item+'\nM24" id="quickgfile">'+item+'</a>');
             }
         }
-        $('div#' + list).append('<div id="gFileLink" class="file-button"><table style="width:100%"><tbody><tr><td style="width:90%;word-break:break-all"><span id="fileName">'
-			+ item + '</span></td><td style="width:10%"><span id="fileDelete" class="glyphicon glyphicon-trash pull-right"></span></td></tr></tbody></table></div>');
+        $('div#' + list).append('<div id="gFileLink" class="file-button"><table style="width:100%"><tbody><tr><td style="width:70%;word-break:break-all"><span id="fileName">'
+			+ item + '</span></td>'
+			+ '<td style="width:20px"><span id="fileInfo" class="glyphicon glyphicon-info-sign pull-right"></span></td>'
+			+ '<td style="width:20px"><span id="filePrint" class="glyphicon glyphicon-print pull-right"></span></td>'
+			+ '<td style="width:20px"><span id="fileDelete" class="glyphicon glyphicon-trash pull-right"></span></td>'
+			+ '</tr></tbody></table></div>');
     });
 }
 
@@ -827,6 +889,12 @@ function modalMessage(title, text, close) {
     $('div#modal div.modal-body').html(text);
     close?$('div#modal button#modalClose').removeClass('hidden'):$('div#modal button#modalClose').addClass('hidden');
     $('div#modal').modal({show:true});
+}
+
+function showFileInfo(fileName) {
+    $('div#modalFileInfo h4.modal-title').text("File information for " + fileName);
+	updateFileInfo(fileName, 'slic3rModal');
+    $('div#modalFileInfo').modal({show:true});
 }
 
 function message(type, text) {
@@ -906,8 +974,19 @@ function updatePage() {
             messageSeqId = status.seq;
             parseResponse(status.resp);
         }
-		currentFilamentPos = status.extr[0];
+		currentFilamentPos = status.extr;
         homedWarning(status.homed[0],status.homed[1],status.homed[2]);
+		currentTool = status.tool;
+		if (currentTool == 1) {
+			$('td#head1').css('background-color', '#E0E0E0');
+		} else {
+			$('td#head1').css('background-color', '#FFFFFF');
+		}
+		if (currentTool == 2) {
+			$('td#head2').css('background-color', '#E0E0E0');
+		} else {
+			$('td#head2').css('background-color', '#FFFFFF');
+		}
 		if (status.status == "S") {
 			//stopped
 			printing = false;
@@ -935,7 +1014,7 @@ function updatePage() {
                 layerCount = Math.ceil(objHeight / layerHeight);
 			}
 			if (printStartTime && objTotalFilament > 0) {
-				setProgress(Math.floor((objUsedFilament / objTotalFilament) * 100), 'print', currentLayer, layerCount);
+				setProgress(Math.floor((objUsedFilament.reduce(function(a, b){ return a + b; }, 0) / objTotalFilament) * 100), 'print', currentLayer, layerCount);
 				estEndTime();
             } else if (printStartTime && layerCount > 0) {
                 setProgress(Math.floor((currentLayer / layerCount) * 100), 'print', currentLayer, layerCount);
@@ -991,11 +1070,16 @@ function updatePage() {
 }
 
 function getFilamentUsed() {
-	if (currentFilamentPos - startingFilamentPos < objUsedFilament - 6) {
-		//gone backwards by more than 6mm so probably just done a G30 E0 to reset the filament origin
-		startingFilamentPos = currentFilamentPos - objUsedFilament;
+	for(var i = 0; i < currentFilamentPos.length && i < startingFilamentPos.length; ++i) {
+		if (currentFilamentPos[i] - startingFilamentPos[i] < objUsedFilament[i] - 12) {
+			//gone backwards by more than 12mm so probably just done a G30 E0 to reset the filament origin
+			startingFilamentPos[i] = currentFilamentPos[i] - objUsedFilament[i];
+		}
+		else {
+			objUsedFilament[i] = currentFilamentPos[i] - startingFilamentPos[i];
+		}
 	}
-	return currentFilamentPos - startingFilamentPos;
+	return objUsedFilament.reduce(function(a, b){ return a + b; }, 0);
 }
 
 function estEndTime() {
@@ -1010,9 +1094,9 @@ function estEndTime() {
         $('span#avg5').text(avg5R.toLocaleTimeString()); 
 	}	
 	if (objTotalFilament > 0) {
-		objUsedFilament = getFilamentUsed();
-		if (objUsedFilament <= objTotalFilament) {
-			var filamentLeft = objTotalFilament - objUsedFilament;
+		var objTotalUsedFilament = getFilamentUsed();
+		if (objTotalUsedFilament <= objTotalFilament) {
+			var filamentLeft = objTotalFilament - objTotalUsedFilament;
 			if (filamentData.length >= 3 && layerCount > 0) {
 				var startAt = (layerData.length > 6) ? layerData.length - 5 : 1;
 				filamentRate = (filamentData[filamentData.length - 1] - filamentData[startAt])/(layerData[filamentData.length - 1] - layerData[startAt]);
@@ -1022,9 +1106,9 @@ function estEndTime() {
 					$('span#filTimeR').text(timeLeft.toHHMMSS());
 					$('span#filTime').text(estEndTimeFil.toLocaleTimeString());
 				}
-			} else if (objUsedFilament > objTotalFilament * 0.03) {	//if at least 3% filament consumed
+			} else if (objTotalUsedFilament > objTotalFilament * 0.03) {	//if at least 3% filament consumed
 				var timeSoFar = utime - printStartTime;
-				var timeLeft = timeSoFar * filamentLeft/objUsedFilament;
+				var timeLeft = timeSoFar * filamentLeft/objTotalUsedFilament;
 				var estEndTimeFil = new Date(utime + timeLeft);
 				$('span#filTimeR').text(timeLeft.toHHMMSS());
 				$('span#filTime').text(estEndTimeFil.toLocaleTimeString());
@@ -1054,7 +1138,10 @@ function resetLayerData(h, f) {
 	}
 	objTotalFilament = f;
 	startingFilamentPos = currentFilamentPos;
-	objUsedFilament = 0;
+	objUsedFilament = [];
+	for(var i = 0; i < startingFilamentPos.length; ++i) {
+		objUsedFilament.push(0);
+	}
     layerData = [];
 	filamentData = [];
     printStartTime = null;
@@ -1090,7 +1177,7 @@ function layers(layer) {
     if ((layer === 1 || layer === 2) && !printStartTime) {
         printStartTime = utime;
         layerData.push(utime);
-		filamentData.push(startingFilamentPos);
+		filamentData.push(startingFilamentPos.reduce(function(a, b){ return a + b; }, 0));
     }
     if (printStartTime) {
         $('span#elapsed').text((utime - printStartTime).toHHMMSS());
@@ -1113,7 +1200,9 @@ function setProgress(percent, bar, layer, layers) {
 			ptext += ", Layer " + layer + " of " + layers;
 		}
 		if (objTotalFilament > 0) {
-			ptext += ", Filament " + (currentFilamentPos - startingFilamentPos) + " of " + objTotalFilament + "mm";
+			var currentTotal = currentFilamentPos.reduce(function(a, b) {return a + b; }, 0);
+			var startingTotal = startingFilamentPos.reduce(function(a, b) {return a + b; }, 0);
+			ptext += ", Filament " + (currentTotal - startingTotal).toFixed(1) + " of " + objTotalFilament + "mm";
 		}
 	}
 	$('span#'+bar+'ProgressText').text(ptext);
