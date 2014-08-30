@@ -2,8 +2,8 @@
 ; Standard configuration G Codes
 M111 S0; Debug off
 M80 ; ATX power on
-M106 S255; fan on
-M540 P0xBE:0xEF:0xC0:0xA8:0x00:0x0E ;Mac = BEEF+IP
+M106 S0; fan off
+M540 PBA:FE:C0:A8:00:0E ;Mac = BAFE+IP
 M550 POrmerod; Set the machine's name
 M551 Pfoo; Blank password
 M552 P192.168.0.14; Set the IP address
