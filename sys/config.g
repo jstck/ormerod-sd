@@ -4,7 +4,7 @@ M80 ; ATX power on
 M106 S0; fan off
 M540 PBA:FE:C0:A8:00:0E ;Mac = BAFE+IP
 M550 POrmerod; Set the machine's name
-M551 Pfoo; Blank password
+M551 P; Blank password
 M552 P192.168.0.14; Set the IP address
 M553 P255.255.255.0; Set netmask
 M554 P192.168.0.1; Set the gateway
