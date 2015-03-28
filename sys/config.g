@@ -18,5 +18,6 @@ G31 Z2.0 P500 ; Set Z probe height and threshold
 M906 X800 Y1000 Z800 E1200 ; Motor currents (mA)
 M203 X10000 Y10000 Z500 E3000 ; movement max speeds
 M201 X1000 Y1000 Z15 E1000; acceleration tweaks for improved finish
-M208 X205 Y200 Z180 ; max travel - allow some "X overshoot" for probing
+M208 X218 Y200 Z180 ; max travel - allow some "X overshoot" for probing
+M208 X-5 Y-5 S1; axis minima
 M563 P1 D0 H1 ; Define tool 1
