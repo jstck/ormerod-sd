@@ -4,13 +4,15 @@ M120 ; Push - save the current feedrate and relative/absolute move status
 
 
 G91                       ; relative mode
+G1 Z2 F200                ; Move bed down a bit
 G1 S1 X280 Y280 F5000     ; coarse home X or Y
-G1 S1 X280                ; coarse home X
-G1 S1 Y280                ; coarse home Y
-G1 X-3 Y-3 F60            ; move away from the endstops
-G1 S1 X10 F200            ; fine home X
-G1 S1 Y10 F200            ; fine home Y
+G1 S1 X280 F5000          ; coarse home X
+G1 S1 Y280 F5000          ; coarse home Y
+G1 X-5 Y-5 F5000            ; move away from the endstops
+G1 S1 X10 F500            ; fine home X
+G1 S1 Y10 F500            ; fine home Y
 
+G1 Z-2 F200				  ; MOve bed back for now (no z probing)
 
 ;Z
 ;G90 ; set movements absolute
